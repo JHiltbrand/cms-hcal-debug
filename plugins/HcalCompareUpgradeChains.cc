@@ -27,7 +27,6 @@
 #include "DataFormats/CaloTowers/interface/CaloTower.h"
 #include "DataFormats/HcalDigi/interface/HcalDigiCollections.h"
 #include "DataFormats/HcalDigi/interface/HcalTriggerPrimitiveDigi.h"
-#include "DataFormats/HcalDigi/interface/HcalUpgradeTriggerPrimitiveDigi.h"  
 #include "DataFormats/HcalDetId/interface/HcalTrigTowerDetId.h"
 #include "DataFormats/HcalDetId/interface/HcalDetId.h"
 #include "DataFormats/HcalRecHit/interface/HBHERecHit.h"
@@ -123,6 +122,8 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       std::vector<int> ev_tp_ieta_;
       std::vector<int> ev_tp_iphi_;
       std::vector<int> ev_tp_depth_;
+      std::vector<double> ev_tp_et_;
+      std::vector<int> ev_tp_peak_;
       std::vector<int> ev_tp_ts0_;
       std::vector<int> ev_tp_ts1_;
       std::vector<int> ev_tp_ts2_;
@@ -155,15 +156,6 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       int mt_ts6_;
       int mt_ts7_;
 
-      int mt_d0_;
-      int mt_d1_;
-      int mt_d2_;
-      int mt_d3_;
-      int mt_d4_;
-      int mt_d5_;
-      int mt_d6_;
-      int mt_d7_;
-
       bool swap_iphi_;
 
       int max_severity_;
@@ -183,7 +175,7 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
 
 {
 
-    consumes<HcalUpgradeTrigPrimDigiCollection>(digis_);
+    consumes<HcalTrigPrimDigiCollection>(digis_);
     consumes<QIE11DigiCollection>(frames_[0]);
     consumes<edm::SortedCollection<HBHERecHit>>(rechits_[0]);
     consumes<std::vector<PileupSummaryInfo> >(puInfo_);
@@ -244,6 +236,8 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     events_->Branch("ieta", &ev_tp_ieta_);
     events_->Branch("iphi", &ev_tp_iphi_);
     events_->Branch("depth", &ev_tp_depth_);
+    events_->Branch("et", &ev_tp_et_);
+    events_->Branch("ispeak", &ev_tp_peak_);
     events_->Branch("ts0", &ev_tp_ts0_);
     events_->Branch("ts1", &ev_tp_ts1_);
     events_->Branch("ts2", &ev_tp_ts2_);
@@ -276,14 +270,6 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     matches_->Branch("ts5", &mt_ts5_);
     matches_->Branch("ts6", &mt_ts6_);
     matches_->Branch("ts7", &mt_ts7_);
-    matches_->Branch("d0", &mt_d0_);
-    matches_->Branch("d1", &mt_d1_);
-    matches_->Branch("d2", &mt_d2_);
-    matches_->Branch("d3", &mt_d3_);
-    matches_->Branch("d4", &mt_d4_);
-    matches_->Branch("d5", &mt_d5_);
-    matches_->Branch("d6", &mt_d6_);
-    matches_->Branch("d7", &mt_d7_);
 }
 
 HcalCompareUpgradeChains::~HcalCompareUpgradeChains() {}
@@ -343,7 +329,7 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
 
     std::map<HcalTrigTowerDetId, std::vector<HBHERecHit>> rhits;
 
-    Handle<HcalUpgradeTrigPrimDigiCollection> digis;
+    Handle<HcalTrigPrimDigiCollection> digis;
     if (!event.getByLabel(digis_, digis)) {
        LogError("HcalTrigPrimDigiCleaner") <<
           "Can't find hcal trigger primitive digi collection with tag '" <<
@@ -387,6 +373,8 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
     ev_tp_ieta_.clear();   ev_tp_ieta_.shrink_to_fit();
     ev_tp_iphi_.clear();   ev_tp_iphi_.shrink_to_fit();
     ev_tp_depth_.clear();  ev_tp_depth_.shrink_to_fit();
+    ev_tp_et_.clear();     ev_tp_et_.shrink_to_fit();
+    ev_tp_peak_.clear();   ev_tp_peak_.shrink_to_fit();
     ev_tp_ts0_.clear();    ev_tp_ts0_.shrink_to_fit();
     ev_tp_ts1_.clear();    ev_tp_ts1_.shrink_to_fit();
     ev_tp_ts2_.clear();    ev_tp_ts2_.shrink_to_fit();
@@ -430,7 +418,9 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
         mt_depth_ = tpid.depth();
         mt_tp_energy_ = decoder_->hcaletValue(tpid, digi.SOI_compressedEt());
         mt_tp_soi_ = digi.SOI_compressedEt();
-             
+        ev_tp_et_.push_back(mt_tp_energy_);
+        ev_tp_peak_.push_back(mt_ispeak_);
+            
         mt_ts0_ = sampleData[0];
         mt_ts1_ = sampleData[1];
         mt_ts2_ = sampleData[2];
@@ -440,25 +430,10 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
         mt_ts6_ = sampleData[6];
         mt_ts7_ = sampleData[7];
         
-        std::vector<int> depthData = digi.getDepthData();
-        mt_d0_ = depthData[0];
-        mt_d1_ = depthData[1];
-        mt_d2_ = depthData[2];
-        mt_d3_ = depthData[3];
-        mt_d4_ = depthData[4];
-        mt_d5_ = depthData[5];
-        mt_d6_ = depthData[6];
-        mt_d7_ = depthData[7];
-
         mt_rh_energy_  = 0.;
         mt_rh_energy_lsb_ = 0.;
 
-        //if (mt_ts3_ == -1) {
-
-        //    printf("EVENT: %4i | IETA: %3i | IPHI: %2i | DEPTH: %1i | PEAK: %2i | ET: %2.1f | FRAME: [%3i, %3i, %3i, %3i, %3i, %3i, %3i, %3i]\n", mt_event_, mt_ieta_, mt_iphi_, mt_depth_, mt_ispeak_, mt_tp_energy_, mt_ts0_, mt_ts1_, mt_ts2_, mt_ts3_, mt_ts4_, mt_ts5_, mt_ts6_, mt_ts7_);
-        //}
-
-        // Do a little try catch nonsense to avoid divideing by 0
+        // Do a little try catch nonsense to avoid dividing by 0
         if (sampleData[3] > 0) { mt_r43_ = float(sampleData[4]) / float(sampleData[3]); }
         else { mt_r43_ = -1.0; }
 
