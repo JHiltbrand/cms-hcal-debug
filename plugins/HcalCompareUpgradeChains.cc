@@ -38,6 +38,8 @@
 #include "Geometry/Records/interface/CaloGeometryRecord.h"
 
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
+#include "DataFormats/VertexReco/interface/VertexFwd.h"
 
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputer.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputerRcd.h"
@@ -119,6 +121,8 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       TH2D* tprh_vs_ieta_high_tpgt0p5_noPeak_;
 
       int ev_tp_event_;
+      int ev_nvtx_;
+      int ev_bx_;
       std::vector<int> ev_tp_ieta_;
       std::vector<int> ev_tp_iphi_;
       std::vector<int> ev_tp_depth_;
@@ -137,6 +141,7 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       double mt_rh_energy_;
       double mt_tp_energy_;
 
+      int mt_nvtx_;
       int mt_ispeak_;
       int mt_ieta_;
       int mt_iphi_;
@@ -144,6 +149,7 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       int mt_tp_soi_;
       int mt_event_;
       int mt_pu_;
+      int mt_bx_;
       double mt_rTPRH_;
       double mt_r43_;
       double mt_r4Total_;
@@ -159,6 +165,7 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       bool swap_iphi_;
 
       int max_severity_;
+      edm::InputTag vtxToken_;
       edm::InputTag puInfo_;
       const HcalChannelQuality* status_;
       const HcalSeverityLevelComputer* comp_;
@@ -171,6 +178,7 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     rechits_(config.getParameter<std::vector<edm::InputTag>>("recHits")),
     swap_iphi_(config.getParameter<bool>("swapIphi")),
     max_severity_(config.getParameter<int>("maxSeverity")),
+    vtxToken_(edm::InputTag("offlinePrimaryVertices")),
     puInfo_(edm::InputTag("addPileupInfo"))
 
 {
@@ -178,6 +186,7 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     consumes<HcalTrigPrimDigiCollection>(digis_);
     consumes<QIE11DigiCollection>(frames_[0]);
     consumes<edm::SortedCollection<HBHERecHit>>(rechits_[0]);
+    consumes<reco::VertexCollection>(vtxToken_);
     consumes<std::vector<PileupSummaryInfo> >(puInfo_);
 
     edm::Service<TFileService> fs;
@@ -247,6 +256,8 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     events_->Branch("ts6", &ev_tp_ts6_);
     events_->Branch("ts7", &ev_tp_ts7_);
     events_->Branch("event", &ev_tp_event_);
+    events_->Branch("bx", &ev_bx_);
+    events_->Branch("nvtx", &ev_nvtx_);
 
     matches_ = fs->make<TTree>("matches", "Matched RH and TP");
     matches_->Branch("RH_energy", &mt_rh_energy_);
@@ -258,6 +269,8 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     matches_->Branch("depth", &mt_depth_);
     matches_->Branch("tp_soi", &mt_tp_soi_);
     matches_->Branch("event", &mt_event_);
+    matches_->Branch("nvtx", &mt_nvtx_);
+    matches_->Branch("bx", &mt_bx_);
     matches_->Branch("pu", &mt_pu_);
     matches_->Branch("rTPRH", &mt_rTPRH_);
     matches_->Branch("r43", &mt_r43_);
@@ -306,18 +319,32 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
     const HcalTrigTowerGeometry& tpd_geo = *tpd_geo_h_;
 
     mt_event_ = event.id().event(); ev_tp_event_ = mt_event_;
-    
-    try {
-        Handle<std::vector<PileupSummaryInfo> > puInfo;
-        event.getByLabel(puInfo_, puInfo);
+    mt_bx_ = event.bunchCrossing(); ev_bx_ = mt_bx_;
+
+    // This only makes sense for MC
+    // Will default to -1 for all other cases
+    mt_pu_ = -1;
+    Handle<std::vector<PileupSummaryInfo> > puInfo;
+    if (event.getByLabel(puInfo_, puInfo)) {
 
         std::vector<PileupSummaryInfo>::const_iterator pui;
-         
         mt_pu_ = puInfo->begin()->getTrueNumInteractions();
+    }
 
-    } catch (...) {
-        // If running on data we'll get here
-        mt_pu_ = -1;
+    // If AOD or RECO is provided with the RAW
+    // then the number of reco vertices will be added as well
+    // otherwise, default to -1
+    ev_nvtx_ = -1; mt_nvtx_ = -1;
+    edm::Handle<reco::VertexCollection> vertices;
+    if (event.getByLabel(vtxToken_, vertices)) {
+        if (vertices.isValid()) {
+            unsigned int nVtx = 0;
+            for (reco::VertexCollection::const_iterator it = vertices->begin(); it != vertices->end(); ++it) {
+              if (!it->isFake()) { nVtx++; }
+            }
+            ev_nvtx_ = nVtx;
+            mt_nvtx_ = ev_nvtx_;
+        }
     }
 
     Handle<QIE11DigiCollection> frames;
