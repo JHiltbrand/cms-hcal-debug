@@ -41,6 +41,9 @@
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 
+#include "DataFormats/Common/interface/TriggerResults.h"
+#include "FWCore/Common/interface/TriggerNames.h"
+
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputer.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputerRcd.h"
 
@@ -121,6 +124,7 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       TH2D* tprh_vs_ieta_high_tpgt0p5_noPeak_;
 
       int ev_tp_event_;
+      int ev_zerobias_;
       int ev_nvtx_;
       int ev_bx_;
       std::vector<int> ev_tp_ieta_;
@@ -142,6 +146,7 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       double mt_tp_energy_;
 
       int mt_nvtx_;
+      int mt_zerobias_;
       int mt_ispeak_;
       int mt_ieta_;
       int mt_iphi_;
@@ -167,8 +172,10 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
       int max_severity_;
       edm::InputTag vtxToken_;
       edm::InputTag puInfo_;
+      edm::InputTag hltToken_;
       const HcalChannelQuality* status_;
       const HcalSeverityLevelComputer* comp_;
+
 };
 
 HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& config) :
@@ -179,7 +186,10 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     swap_iphi_(config.getParameter<bool>("swapIphi")),
     max_severity_(config.getParameter<int>("maxSeverity")),
     vtxToken_(edm::InputTag("offlinePrimaryVertices")),
-    puInfo_(edm::InputTag("addPileupInfo"))
+    puInfo_(edm::InputTag("addPileupInfo")),
+    hltToken_(edm::InputTag("TriggerResults", "", "HLT"))
+
+
 
 {
 
@@ -188,6 +198,7 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     consumes<edm::SortedCollection<HBHERecHit>>(rechits_[0]);
     consumes<reco::VertexCollection>(vtxToken_);
     consumes<std::vector<PileupSummaryInfo> >(puInfo_);
+    consumes<edm::TriggerResults>(hltToken_);
 
     edm::Service<TFileService> fs;
 
@@ -258,6 +269,7 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     events_->Branch("event", &ev_tp_event_);
     events_->Branch("bx", &ev_bx_);
     events_->Branch("nvtx", &ev_nvtx_);
+    events_->Branch("zerobias", &ev_zerobias_);
 
     matches_ = fs->make<TTree>("matches", "Matched RH and TP");
     matches_->Branch("RH_energy", &mt_rh_energy_);
@@ -270,6 +282,7 @@ HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& conf
     matches_->Branch("tp_soi", &mt_tp_soi_);
     matches_->Branch("event", &mt_event_);
     matches_->Branch("nvtx", &mt_nvtx_);
+    matches_->Branch("zerobias", &mt_zerobias_);
     matches_->Branch("bx", &mt_bx_);
     matches_->Branch("pu", &mt_pu_);
     matches_->Branch("rTPRH", &mt_rTPRH_);
@@ -320,6 +333,22 @@ HcalCompareUpgradeChains::analyze(const edm::Event& event, const edm::EventSetup
 
     mt_event_ = event.id().event(); ev_tp_event_ = mt_event_;
     mt_bx_ = event.bunchCrossing(); ev_bx_ = mt_bx_;
+
+    mt_zerobias_ = 0; ev_zerobias_ = 0;
+    Handle<TriggerResults> hltResults;
+    if (event.getByLabel(hltToken_, hltResults)) {
+
+      const TriggerNames& TrigNames = event.triggerNames(*hltResults);
+      const int ntrigs = hltResults->size();
+ 
+      for (int itr = 0; itr < ntrigs; itr++) {
+        TString trigName = TrigNames.triggerName(itr);
+        if (trigName.Contains("HLT_ZeroBias_v") and hltResults->accept(itr)) {
+            mt_zerobias_ = 1; ev_zerobias_ = 1;
+            break;
+        }
+      }
+    }
 
     // This only makes sense for MC
     // Will default to -1 for all other cases
