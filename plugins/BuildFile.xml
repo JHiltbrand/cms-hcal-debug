@@ -19,4 +19,5 @@
 <use name="RecoLocalCalo/HcalRecAlgos"/>
 <use name="Debug/HcalDebug"/>
 <use name="boost"/>
+<flags SKIP_FILES="HcalCompareUpgradeChains.cc"/>    
 <flags EDM_PLUGIN="1"/>

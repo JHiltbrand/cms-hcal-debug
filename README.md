@@ -87,16 +87,20 @@ Local runs are based on `HcalTBSource` rather than `PoolSource` input and so can
 
 ## Analyzing TPs with depth/timing information
 
-    cmsrel CMSSW_10_3_1 
-    cd CMSSW_10_3_1/src 
+    cmsrel CMSSW_10_6_0 
+    cd CMSSW_10_6_0/src 
     cmsenv 
     git cms-init 
-    git cms-merge-topic --unsafe georgia14:upgradeTPs-103X 
+    git cms-merge-topic --unsafe georgia14:upgradeHcalTPs-106X 
     git clone git@github.com:cms-hcal-trigger/cms-hcal-debug.git Debug/HcalDebug 
 
-In python/customise.py, compare_tp_reco: replace 'HcalCompareLegacyChains' with 'HcalCompareUpgradeChains'.
+In Debug/HcalDebug/python/customize.py, compare_tp_reco: replace 'HcalCompareLegacyChains' with 'HcalCompareUpgradeChains'. And in Debug/HcalDebug/plugins/BuildFile.xml comment out line: 
+
+    <flags SKIP_FILES="HcalCompareUpgradeChains.cc"/>    
+
+Then compile:
 
     scram b -j 4 
 
-See an example config file in test/analyze_325170.py
-There exist now upgradeTPs-104X, upgradeTPs-106X branches rebased in 104X, 106X respectively.  
+See an example config file in test/analyze_325170.py (in 10_3_1) or analyze_run3.py (in 10_6_0)
+There exist now upgradeTPs-103X, upgradeTPs-104X, upgradeTPs-106X branches rebased in 103X, 104X, 106X respectively.  

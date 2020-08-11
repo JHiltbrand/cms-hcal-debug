@@ -39,8 +39,8 @@ def add_l1t(process):
     except ValueError:
         process.tpCheck *= process.l1tCaloLayer1Digis
 
-#def analyze_tp(process, name, tag1):
-def analyze_tp(process, options, name, tag1):
+def analyze_tp(process, name, tag1):
+#def analyze_tp(process, options, name, tag1):
     process.load('SimCalorimetry.HcalTrigPrimProducers.hcaltpdigi_cff')
     add_fileservice(process)
     add_path(process)
@@ -64,11 +64,11 @@ def analyze_l1t_tp(process):
     return analyze_tp(process, 'analyzeL1T', 'l1tCaloLayer1Digis')
 
 
-def analyze_raw_tp(process, options):
-    return analyze_tp(process, options, 'analyzeRaw', 'hcalDigis')
+#def analyze_raw_tp(process, options):
+#    return analyze_tp(process, options, 'analyzeRaw', 'hcalDigis')
 
-#def analyze_raw_tp(process):
-#    return analyze_tp(process, 'analyzeRaw', 'hcalDigis')
+def analyze_raw_tp(process):
+    return analyze_tp(process, 'analyzeRaw', 'hcalDigis')
 
 
 def analyze_emul_tp(process):
