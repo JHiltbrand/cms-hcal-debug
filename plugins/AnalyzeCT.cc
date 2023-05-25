@@ -24,7 +24,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/Framework/interface/Event.h"
@@ -44,7 +44,7 @@
 // class declaration
 //
 
-class AnalyzeCT : public edm::EDAnalyzer {
+class AnalyzeCT : public edm::one::EDAnalyzer<> {
    public:
       explicit AnalyzeCT(const edm::ParameterSet&);
       ~AnalyzeCT();
@@ -68,7 +68,6 @@ class AnalyzeCT : public edm::EDAnalyzer {
 };
 
 AnalyzeCT::AnalyzeCT(const edm::ParameterSet& config) :
-   edm::EDAnalyzer(),
    towers_(config.getParameter<edm::InputTag>("caloTowers")),
    threshold_(config.getUntrackedParameter<double>("threshold", 0.))
 {

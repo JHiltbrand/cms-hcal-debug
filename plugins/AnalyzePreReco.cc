@@ -24,7 +24,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/Framework/interface/Event.h"
@@ -44,7 +44,7 @@
 // class declaration
 //
 
-class AnalyzePreReco : public edm::EDAnalyzer {
+class AnalyzePreReco : public edm::one::EDAnalyzer<> {
    public:
       explicit AnalyzePreReco(const edm::ParameterSet&);
       ~AnalyzePreReco();
@@ -73,7 +73,6 @@ class AnalyzePreReco : public edm::EDAnalyzer {
 };
 
 AnalyzePreReco::AnalyzePreReco(const edm::ParameterSet& config) :
-   edm::EDAnalyzer(),
    prehits_(config.getParameter<edm::InputTag>("preRecHits")),
    threshold_(config.getUntrackedParameter<double>("threshold", 0.))
 {

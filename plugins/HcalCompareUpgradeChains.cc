@@ -25,7 +25,7 @@
 #include <algorithm>
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/Framework/interface/Event.h"
@@ -80,7 +80,7 @@
 // class declaration
 //
 
-class HcalCompareUpgradeChains : public edm::EDAnalyzer {
+class HcalCompareUpgradeChains : public edm::one::EDAnalyzer<> {
    public:
       explicit HcalCompareUpgradeChains(const edm::ParameterSet&);
       ~HcalCompareUpgradeChains();
@@ -165,7 +165,6 @@ class HcalCompareUpgradeChains : public edm::EDAnalyzer {
 };
 
 HcalCompareUpgradeChains::HcalCompareUpgradeChains(const edm::ParameterSet& config) :
-   edm::EDAnalyzer(),
    first_(true),
    frames_(config.getParameter<std::vector<edm::InputTag>>("dataFrames")),
    digis_(config.getParameter<edm::InputTag>("triggerPrimitives")),

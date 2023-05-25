@@ -26,7 +26,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/Framework/interface/Event.h"
@@ -83,7 +83,7 @@
 
 
 
-class AnalyzeTP : public edm::EDAnalyzer {
+class AnalyzeTP : public edm::one::EDAnalyzer<> {
    public:
       explicit AnalyzeTP(const edm::ParameterSet&);
       ~AnalyzeTP();
@@ -164,7 +164,6 @@ class AnalyzeTP : public edm::EDAnalyzer {
 };
 
 AnalyzeTP::AnalyzeTP(const edm::ParameterSet& config):
-  edm::EDAnalyzer(),
   digis_(config.getParameter<edm::InputTag>("triggerPrimitives")),
   doReco_(config.getParameter<bool>("doReco")),
   maxVtx_(config.getParameter<unsigned int>("maxVtx")),

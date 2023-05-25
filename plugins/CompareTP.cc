@@ -26,7 +26,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/Framework/interface/Event.h"
@@ -72,7 +72,7 @@
 // class declaration
 //
 
-class CompareTP : public edm::EDAnalyzer {
+class CompareTP : public edm::one::EDAnalyzer<> {
    public:
       explicit CompareTP(const edm::ParameterSet&);
       ~CompareTP();
@@ -117,7 +117,6 @@ class CompareTP : public edm::EDAnalyzer {
 };
 
 CompareTP::CompareTP(const edm::ParameterSet& config) :
-   edm::EDAnalyzer(),
    digis_(config.getParameter<edm::InputTag>("triggerPrimitives")),
    edigis_(config.getParameter<edm::InputTag>("emulTriggerPrimitives")),
    swap_iphi_(config.getParameter<bool>("swapIphi")),

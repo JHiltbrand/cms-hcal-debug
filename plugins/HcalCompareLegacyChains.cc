@@ -23,7 +23,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 
 #include "FWCore/Framework/interface/Event.h"
@@ -63,7 +63,7 @@
 // class declaration
 //
 
-class HcalCompareLegacyChains : public edm::EDAnalyzer {
+class HcalCompareLegacyChains : public edm::one::EDAnalyzer<> {
    public:
       explicit HcalCompareLegacyChains(const edm::ParameterSet&);
       ~HcalCompareLegacyChains();
@@ -72,7 +72,7 @@ class HcalCompareLegacyChains : public edm::EDAnalyzer {
 
    private:
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
-      virtual void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
+      virtual void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&);
 
       double get_cosh(const HcalDetId&);
 
@@ -142,7 +142,6 @@ class HcalCompareLegacyChains : public edm::EDAnalyzer {
 };
 
 HcalCompareLegacyChains::HcalCompareLegacyChains(const edm::ParameterSet& config) :
-   edm::EDAnalyzer(),
    first_(true),
    frames_(config.getParameter<std::vector<edm::InputTag>>("dataFrames")),
    digis_(config.getParameter<edm::InputTag>("triggerPrimitives")),
