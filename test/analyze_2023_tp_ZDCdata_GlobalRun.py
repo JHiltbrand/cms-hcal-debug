@@ -40,51 +40,51 @@ process.es_ascii = cms.ESSource('HcalTextCalibrations',
    input = cms.VPSet(
       cms.PSet(
          object = cms.string('ChannelQuality'),
-         file   = cms.FileInPath(CONDDIR+'/ChannelQuality/ChannelQuality_Run374000_50ZDCchannels.txt')
+         file   = cms.FileInPath(CONDDIR+'/ChannelQuality/HcalChannelQuality_2023_v1.2_data.txt')
       ),
       cms.PSet(
          object = cms.string('Pedestals'),
-         file   = cms.FileInPath(CONDDIR+'/Pedestals/Pedestals_Run374000_50ZDCchannels.txt')
-      ),
+	 file   = cms.FileInPath(CONDDIR+'/Pedestals/Pedestals_Run374000_50ZDCchannels.txt')
+      ),	
       cms.PSet(
          object = cms.string('EffectivePedestals'),
-         file   = cms.FileInPath(CONDDIR+'/EffectivePedestals/EffectivePedestals_Run374000_50ZDCchannels.txt')
-      ),
+	 file   = cms.FileInPath(CONDDIR+'/EffectivePedestals/HcalPedestals_2023_v1.4_data_effective_ZDCpedestals.txt')
+      ),	
       cms.PSet(
          object = cms.string('Gains'),
-         file   = cms.FileInPath(CONDDIR+'/Gains/Gains_Run374000_50ZDCchannels.txt')
+	 file   = cms.FileInPath(CONDDIR+'/Gains/Gains_Run374000_50ZDCchannels_ZDCgains_v2.txt')
       ),
       cms.PSet(
          object = cms.string('RespCorrs'),
-         file   = cms.FileInPath(CONDDIR+'/RespCorrs/RespCorrs_Run374000_50ZDCchannels.txt')
+	 file   = cms.FileInPath(CONDDIR+'/RespCorrs/HcalRespCorrs_2023_v3.0_data.txt')
       ),
       cms.PSet(
         object = cms.string('ElectronicsMap'),
-        file   = cms.FileInPath(CONDDIR+'/ElectronicsMap/emap_2023_newZDC.txt')
+	file   = cms.FileInPath(CONDDIR+'/ElectronicsMap/HcalElectronicsMap_2023_v1.0_data.txt')
       ),
       cms.PSet(
         object = cms.string('TPParameters'),
-        file   = cms.FileInPath(CONDDIR+'/TPParameters/TPParameters_Run374000.txt')
+	file   = cms.FileInPath(CONDDIR+'/TPParameters/TPParameters_Run374000.txt')
       ),
       cms.PSet(
         object = cms.string('TPChannelParameters'),
-        file   = cms.FileInPath(CONDDIR+'/TPChannelParameters/TPChannelParameters_Run374000_50ZDCchannels.txt')
+	file   = cms.FileInPath(CONDDIR+'/TPChannelParameters/TPChannelParameters_Run374000_50ZDCchannels_PFA1p.txt')
       ),
       cms.PSet(
         object = cms.string('LUTCorrs'),
-        file   = cms.FileInPath(CONDDIR+'/LUTCorrs/LUTCorrs_Run374000_50ZDCchannels.txt')
+	file   = cms.FileInPath(CONDDIR+'/LUTCorrs/LUTCorrs_Run374000_50ZDCchannels.txt')
       ),
       cms.PSet(
         object = cms.string('QIEData'),
-        file   = cms.FileInPath(CONDDIR+'/QIEData/QIEData_Run374000_50ZDCchannels.txt')
+	file   = cms.FileInPath(CONDDIR+'/QIEData/QIEData_Run374000_50ZDCchannels.txt')
       ),
       cms.PSet(
         object = cms.string('QIETypes'),
-        file   = cms.FileInPath(CONDDIR+'/QIETypes/QIETypes_Run374000_50ZDCchannels.txt')
+	file   = cms.FileInPath(CONDDIR+'/QIETypes/QIETypes_Run374000_50ZDCchannels.txt')
       ),
       cms.PSet(
         object = cms.string('LutMetadata'),
-        file   = cms.FileInPath(CONDDIR+'/LutMetadata/LutMetadata_Run374000_50ZDCchannels.txt')
+	file   = cms.FileInPath(CONDDIR+'/LutMetadata/LutMetadata_Run374000_50ZDCchannels.txt')
       ),
       cms.PSet(
         object = cms.string('TimeCorrs'),
