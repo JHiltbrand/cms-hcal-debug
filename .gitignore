@@ -1,4 +1,9 @@
-*~
-*.swp
-*.pyc
+**~
+**.swp
+**.pyc
+**.db
+**.root
+**condor**
+**histos**
+**plots**
 __init__.py
