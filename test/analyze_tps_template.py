@@ -3,7 +3,8 @@ import FWCore.ParameterSet.Config as cms
 from Configuration.AlCa.GlobalTag import GlobalTag
 from Configuration.StandardSequences.Eras import eras
 
-process = cms.Process('ANATPS', eras.__ERA__)
+processName = "ANATPS"
+process = cms.Process(processName, eras.__ERA__)
 
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 # syntax for override of a single condition
@@ -25,24 +26,23 @@ process.load('SimCalorimetry.HcalTrigPrimProducers.hcaltpdigi_cff')
 
 process.TFileService = cms.Service("TFileService",
                                    closeFileFast=cms.untracked.bool(True),
-                                   fileName=cms.string('compare_tp.root'))
+                                   fileName=cms.string('analyze_tps.root'))
 
 # LUTGenerationMode = False => use L1TriggerObjects (for data)
 # LUTGenerationMode = True => use L1TriggerObjects (for MC; default)
-process.HcalTPGCoderULUT.LUTGenerationMode = cms.bool(False)
-process.simHcalTriggerPrimitiveDigis.inputLabel = cms.VInputTag("hcalDigis", "hcalDigis")
-process.simHcalTriggerPrimitiveDigis.inputUpgradeLabel = cms.VInputTag("hcalDigis", "hcalDigis")
+process.HcalTPGCoderULUT.LUTGenerationMode = cms.bool(__GENLUTS__)
+process.simHcalTriggerPrimitiveDigis.inputLabel        = cms.VInputTag("__DIGISTAG__", "__DIGISTAG__")
+process.simHcalTriggerPrimitiveDigis.inputUpgradeLabel = cms.VInputTag("__UPGRADEDIGISTAG1__", "__UPGRADEDIGISTAG2__")
 
 process.hcalDigis.silent = cms.untracked.bool(False)
 
-process.analyzeTPs = cms.EDAnalyzer("analyzeTPs",
-                                 triggerPrimitives=cms.InputTag("hcalDigis"),
-                                 emulTriggerPrimitives=cms.InputTag("simHcalTriggerPrimitiveDigis"),
+process.analyzeTPs = cms.EDAnalyzer("AnalyzeTPs",
+                                 packedTriggerPrimitives=cms.InputTag("__PACKEDTPTAG__", "", __PACKEDTPPROCESSNAME__),
+                                 reemulTriggerPrimitives=cms.InputTag("simHcalTriggerPrimitiveDigis", "", processName),
                                  swapIphi=cms.bool(False),
-				                 printSwaps=cms.untracked.bool(False),
-                                 swapIeta=cms.bool(False))
+                                 )
 
 process.p = cms.Path(
     process.hcalDigis *
     process.simHcalTriggerPrimitiveDigis *
-    process.compare)
+    process.analyzeTPs)

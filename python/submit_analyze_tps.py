@@ -7,10 +7,10 @@ import subprocess
 import shutil
 from time import strftime
 
-# Write .sh script to be run by Condor
+# Write .sh script to be run by Condor on the worker node
 def generate_job_steerer(workingDir, outputDir, l1TrgObjsFile, CMSSW_VERSION):
 
-    scriptFile = open(f"{workingDir}/run_compare_tp.sh", "w")
+    scriptFile = open(f"{workingDir}/run_analyze_tps.sh", "w")
     scriptFile.write("#!/bin/bash\n\n")
     scriptFile.write("PROXY=$1\n")
     scriptFile.write("shift\n")
@@ -24,22 +24,22 @@ def generate_job_steerer(workingDir, outputDir, l1TrgObjsFile, CMSSW_VERSION):
     scriptFile.write("voms-proxy-info -all\n")
     scriptFile.write("voms-proxy-info -all -file $PROXY\n\n")
 
-    scriptFile.write("sed -i \"s#__FILE__#$FILE#g\" compare_tp.py\n\n")
+    scriptFile.write("sed -i \"s#__FILE__#$FILE#g\" analyze_tps.py\n\n")
 
     scriptFile.write("export SCRAM_ARCH=el9_amd64_gcc12\n")
     scriptFile.write("source /cvmfs/cms.cern.ch/cmsset_default.sh\n") 
     scriptFile.write(f"eval `scramv1 project CMSSW {CMSSW_VERSION}`\n\n")
 
     scriptFile.write(f"tar -xf {CMSSW_VERSION}.tar.gz\n")
-    scriptFile.write(f"mv compare_tp.py {CMSSW_VERSION}/src\n")
+    scriptFile.write(f"mv analyze_tps.py {CMSSW_VERSION}/src\n")
     if l1TrgObjsFile != "":
         scriptFile.write(f"mv {l1TrgObjsFile} {CMSSW_VERSION}/src\n")
     scriptFile.write(f"cd {CMSSW_VERSION}/src\n")
     scriptFile.write("scramv1 b ProjectRename\n")
     scriptFile.write("eval `scramv1 runtime -sh`\n\n")
 
-    scriptFile.write("cmsRun compare_tp.py\n\n")
-    scriptFile.write(f"xrdcp -f compare_tp.root {outputDir}/compare_tp_$JOB.root 2>&1\n\n")
+    scriptFile.write("cmsRun analyze_tps.py\n\n")
+    scriptFile.write(f"xrdcp -f analyze_tps.root {outputDir}/analyze_tps_$JOB.root 2>&1\n\n")
     scriptFile.write("cd ${_CONDOR_SCRATCH_DIR}\n")
     
     scriptFile.write("shopt -s extglob\n")
@@ -50,7 +50,7 @@ def generate_job_steerer(workingDir, outputDir, l1TrgObjsFile, CMSSW_VERSION):
 def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION):
 
     condorSubmit = open(f"{workingDir}/condorSubmit.jdl", "w")
-    condorSubmit.write(f"Executable            = {workingDir}/run_compare_tp.sh\n")
+    condorSubmit.write(f"Executable            = {workingDir}/run_analyze_tps.sh\n")
     condorSubmit.write("Universe              =  vanilla\n")
     condorSubmit.write("Requirements          =  (OpSysAndVer =?= \"AlmaLinux9\")\n")
     condorSubmit.write("Request_Memory        =  2 Gb\n")
@@ -64,7 +64,7 @@ def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION):
     condorSubmit.write("output_destination = root://eosuser.cern.ch///eos/user/j/jhiltbra/HcalTrigger/\n")
     condorSubmit.write("Proxy_path        =  /afs/cern.ch/user/j/jhiltbra/private/grid_proxy.x509\n")
     condorSubmit.write("Should_Transfer_Files = YES\n")
-    condorSubmit.write(f"Transfer_Input_Files = {workingDir}/{l1TrgObjsFile}, {workingDir}/compare_tp.py, {workingDir}/run_compare_tp.sh, {workingDir}/{CMSSW_VERSION}.tar.gz\n")
+    condorSubmit.write(f"Transfer_Input_Files = {workingDir}/{l1TrgObjsFile}, {workingDir}/analyze_tps.py, {workingDir}/run_analyze_tps.sh, {workingDir}/{CMSSW_VERSION}.tar.gz\n")
    
     iJob = 0 
     for file in filelist:
@@ -116,12 +116,22 @@ if __name__ == '__main__':
     CMSSW_VERSION = os.getenv("CMSSW_VERSION")
 
     # Get the list of input files to run over
+    isMC = False
     inputFiles = []
+
+    # Check keywords in requested data set to determine if running on MC or data
+    if any(mcStr in dataset for mcStr in ["GEN", "SIM", "_mc"]):
+        isMC = True
+
     for run in runs:
+
+        runStr = "run={run}"
+        if isMC:
+            runStr = ""
 
         explicitDataset = dataset
         if "*" in dataset:
-            proc = subprocess.run(f'dasgoclient --query="dataset run={run}"', capture_output=True, shell=True) 
+            proc = subprocess.run(f'dasgoclient --query="dataset {runStr}"', capture_output=True, shell=True) 
             datasets = proc.stdout.decode('utf-8').split("\n")
             for dset in datasets:
                 dsetchunks = dset.split("/")
@@ -134,7 +144,7 @@ if __name__ == '__main__':
                     explicitDataset = dset
                     break
         
-        proc = subprocess.run(f'dasgoclient --query="file dataset={explicitDataset} run={run}"', capture_output=True, shell=True)
+        proc = subprocess.run(f'dasgoclient --query="file dataset={explicitDataset} {runStr}"', capture_output=True, shell=True)
         files = proc.stdout.decode('utf-8').split("\n")
         for file in files:
             inputFiles.append(file.rstrip())
@@ -156,10 +166,38 @@ if __name__ == '__main__':
     if l1TrgObjs != "":
         shutil.copy2(l1TrgObjs, workingDir)
 
+    # If the packedTPs come from the sim collection
+    # then we don't need to run hcalDigis (to unpack RAW etc.)
+    # and can just grab the packedTP collection literally
+    # Likewise, the process name is HLT is this case
+    commentOutChar        = ""
+    packedTPtag           = "hcalDigis"
+    inputDigisTag         = "hcalDigis" 
+    inputUpgradeDigisTag1 = "hcalDigis" 
+    inputUpgradeDigisTag2 = "hcalDigis" 
+    packedTPsProcessName  = "processName"
+    generateLUTs          = "False"
+    if isMC:
+        commentOutChar        = "#"
+        packedTPtag           = "simHcalTriggerPrimitiveDigis"
+        inputDigisTag         = "simHcalUnsuppressedDigis"
+        inputUpgradeDigisTag1 = "simHcalUnsuppressedDigis:HBHEQIE11DigiCollection"
+        inputUpgradeDigisTag2 = "simHcalUnsuppressedDigis:HFQIE10DigiCollection"
+        packedTPsProcessName  = "\\\"HLT\\\""
+        generateLUTs          = "True"
+
+
     subprocess.call([f'sed -e "s#__ERA__#{era}#g" \
                            -e "s#__GLOBALTAG__#{globalTag}#g" \
                            -e "s#__OVERRIDE__#{overrideL1TrgObjs}#g" \
-                           {hcalDir}/test/compare_tp_template.py > {workingDir}/compare_tp.py'], shell=True)
+                           -e "s#__DIGISTAG__#{inputDigisTag}#g" \
+                           -e "s#__UPGRADEDIGISTAG1__#{inputUpgradeDigisTag1}#g" \
+                           -e "s#__UPGRADEDIGISTAG2__#{inputUpgradeDigisTag2}#g" \
+                           -e "s#__PACKEDTPTAG__#{packedTPtag}#g" \
+                           -e "s#__PACKEDTPPROCESSNAME__#{packedTPsProcessName}#g" \
+                           -e "s#__GENLUTS__#{generateLUTs}#g" \
+                           -e "s@process.hcalDigis@{commentOutChar}process.hcalDigis@g" \
+                           {hcalDir}/test/analyze_tps_template.py > {workingDir}/analyze_tps.py'], shell=True)
     
     # Create directories to save logs
     os.makedirs(f"{workingDir}/logs")
@@ -170,7 +208,7 @@ if __name__ == '__main__':
     # Write the condor submit file for condor to do its thing
     generate_condor_submit(workingDir, inputFiles, l1TrgObjs, CMSSW_VERSION)    
 
-    subprocess.call(["chmod", "+x", f"{workingDir}/run_compare_tp.sh"])
+    subprocess.call(["chmod", "+x", f"{workingDir}/run_analyze_tps.sh"])
 
     subprocess.call(["tar", "--exclude-caches-all", "--exclude-vcs", "-zcf", f"{workingDir}/{CMSSW_VERSION}.tar.gz", "--exclude=tmp", "--exclude=bin", "--exclude=condor", "--exclude=histos", "--exclude=plots", "--exclude=inputs", "-C", f"{CMSSW_BASE}/..", CMSSW_VERSION])
     
