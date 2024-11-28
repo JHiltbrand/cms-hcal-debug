@@ -77,13 +77,13 @@ def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--submit"     , dest="submit"     , help="submit to cluster"       , default=False, action="store_true")
-    parser.add_argument("--dataset"    , dest="dataset"    , help="Unique path to dataset"  , type=str , default="/HcalNZS/*Run2024*/RAW*")
-    parser.add_argument("--tag"        , dest="tag"        , help="Unique tag"              , type=str , default="NULL")
-    parser.add_argument("--runs"       , dest="runs"       , help="Data run to process"     , type=str , nargs="+", default=["1"])
-    parser.add_argument("--era"        , dest="era"        , help="Era of of dataset"       , type=str , default="Run3")
-    parser.add_argument("--globalTag"  , dest="globalTag"  , help="Global tag to use"       , type=str , default="140X_dataRun3_Prompt_v4")
-    parser.add_argument("--l1TrgObjs"  , dest="l1TrgObjs"  , help="Override with L1TrgObj"  , type=str , default="")
+    parser.add_argument("--submit"     , dest="submit"     , help="do submit to condor"       , default=False, action="store_true")
+    parser.add_argument("--dataset"    , dest="dataset"    , help="Unique path to DAS dataset", type=str , default="/HcalNZS/*Run2024*/RAW*")
+    parser.add_argument("--tag"        , dest="tag"        , help="Unique tag name for output", type=str , default="NULL")
+    parser.add_argument("--runs"       , dest="runs"       , help="Run(s) to process"         , type=str , nargs="+", default=["1"])
+    parser.add_argument("--era"        , dest="era"        , help="Era to use"                , type=str , default="Run3")
+    parser.add_argument("--globalTag"  , dest="globalTag"  , help="Global tag to use"         , type=str , default="140X_dataRun3_Prompt_v4")
+    parser.add_argument("--l1TrgObjs"  , dest="l1TrgObjs"  , help="Override GT with L1TrgObj" , type=str , default="")
     args = parser.parse_args()
 
     tag         = args.tag
