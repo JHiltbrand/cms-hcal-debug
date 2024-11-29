@@ -39,7 +39,6 @@ process.hcalDigis.silent = cms.untracked.bool(False)
 process.analyzeTPs = cms.EDAnalyzer("AnalyzeTPs",
                                  packedTriggerPrimitives=cms.InputTag("__PACKEDTPTAG__", "", __PACKEDTPPROCESSNAME__),
                                  reemulTriggerPrimitives=cms.InputTag("simHcalTriggerPrimitiveDigis", "", processName),
-                                 swapIphi=cms.bool(False),
                                  )
 
 process.p = cms.Path(

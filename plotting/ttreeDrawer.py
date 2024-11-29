@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(usage)
     parser.add_argument("--inputDir",  dest="inputDir",  help="Path to ntuples",      required=True            )
     parser.add_argument("--outputDir", dest="outputDir", help="path for output ROOT", required=True            )
-    parser.add_argument("--tree",      dest="tree",      help="TTree name to draw",   default="compare/tps"    )
+    parser.add_argument("--tree",      dest="tree",      help="TTree name to draw",   default="analyzeTPs/tps"    )
     parser.add_argument("--year",      dest="year",      help="which year",           default="2024"           )
     parser.add_argument("--options",   dest="options",   help="histo options file",   default="ttreeDrawer_aux")
     args = parser.parse_args()
