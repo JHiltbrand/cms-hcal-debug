@@ -1,6 +1,6 @@
 # Setup Working Environment
 
-    cmsrel CMSSW_14_2_0_pre4
+    cmsrel CMSSW_14_2_1
     cd $CMSSW_BASE/src
     cmsenv
 
