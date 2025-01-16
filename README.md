@@ -62,7 +62,7 @@ A python script and associated side car file perform `TTree->Draw` with full con
 
 An example call to this script could be:
 
-     python3 ttreeDrawer.py --inputDir /eos/user/j/$USER/HcalTrigger/386864_HcalNZS_NewPeds/ --outputDir histos/386864_HcalNZS_NewPeds --options ttreeDrawer_aux
+     python3 ttreeDrawer.py --inputDir /eos/user/${USER:0:1}/${USER}/HcalTrigger/386864_HcalNZS_NewPeds/ --outputDir histos/386864_HcalNZS_NewPeds --options ttreeDrawer_aux
 
 ## Step 2.
 
