@@ -2,6 +2,7 @@
 
 import os
 import sys
+import glob
 import argparse
 import subprocess
 import shutil
@@ -15,8 +16,6 @@ def generate_job_steerer(workingDir, outputDir, l1TrgObjsFile, CMSSW_VERSION):
     scriptFile.write("PROXY=$1\n")
     scriptFile.write("shift\n")
     scriptFile.write("JOB=$1\n")
-    scriptFile.write("shift\n")
-    scriptFile.write("RUN=$1\n")
     scriptFile.write("shift\n")
     scriptFile.write("FILE=$1\n\n")
 
@@ -47,7 +46,7 @@ def generate_job_steerer(workingDir, outputDir, l1TrgObjsFile, CMSSW_VERSION):
     scriptFile.close()
 
 # Write Condor submit file 
-def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION):
+def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION, USER, onEOS):
 
     condorSubmit = open(f"{workingDir}/condorSubmit.jdl", "w")
     condorSubmit.write(f"Executable            = {workingDir}/run_analyze_tps.sh\n")
@@ -61,14 +60,18 @@ def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION):
     condorSubmit.write("+JobFlavour           = \"microcentury\"\n")
     condorSubmit.write("MY.SendCredential     = true\n")
     condorSubmit.write("when_to_transfer_output = on_success\n")
-    condorSubmit.write("output_destination = root://eosuser.cern.ch///eos/user/j/jhiltbra/HcalTrigger/\n")
-    condorSubmit.write("Proxy_path        =  /afs/cern.ch/user/j/jhiltbra/private/grid_proxy.x509\n")
+    condorSubmit.write(f"output_destination = root://eosuser.cern.ch///eos/user/{USER[0]}/{USER}/HcalTrigger/\n")
+    condorSubmit.write(f"Proxy_path        =  /afs/cern.ch/user/{USER[0]}/{USER}/private/grid_proxy.x509\n")
     condorSubmit.write("Should_Transfer_Files = YES\n")
     condorSubmit.write(f"Transfer_Input_Files = {workingDir}/{l1TrgObjsFile}, {workingDir}/analyze_tps.py, {workingDir}/run_analyze_tps.sh, {workingDir}/{CMSSW_VERSION}.tar.gz\n")
    
     iJob = 0 
     for file in filelist:
-        condorSubmit.write(f"Arguments = $(Proxy_path) {iJob} {run} root://cms-xrd-global.cern.ch/{file}\n")
+        fullFilePath = f"root://cms-xrd-global.cern.ch/{file}"
+        if onEOS:
+            fullFilePath = f"root://eosuser.cern.ch/{file}"
+           
+        condorSubmit.write(f"Arguments = $(Proxy_path) {iJob} {fullFilePath}\n")
         condorSubmit.write("Queue\n\n")
         iJob += 1
     
@@ -77,79 +80,89 @@ def generate_condor_submit(workingDir, filelist, l1TrgObjsFile, CMSSW_VERSION):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--submit"     , dest="submit"     , help="do submit to condor"       , default=False, action="store_true")
-    parser.add_argument("--dataset"    , dest="dataset"    , help="Unique path to DAS dataset", type=str , default="/HcalNZS/*Run2024*/RAW*")
-    parser.add_argument("--tag"        , dest="tag"        , help="Unique tag name for output", type=str , default="NULL")
-    parser.add_argument("--runs"       , dest="runs"       , help="Run(s) to process"         , type=str , nargs="+", default=["1"])
-    parser.add_argument("--era"        , dest="era"        , help="Era to use"                , type=str , default="Run3")
-    parser.add_argument("--globalTag"  , dest="globalTag"  , help="Global tag to use"         , type=str , default="140X_dataRun3_Prompt_v4")
-    parser.add_argument("--l1TrgObjs"  , dest="l1TrgObjs"  , help="Override GT with L1TrgObj" , type=str , default="")
+    parser.add_argument("--submit"   , dest="submit"   , help="do submit to condor"       , default=False, action="store_true")
+    parser.add_argument("--overwrite", dest="overwrite", help="overwrite output EOS"      , default=False, action="store_true")
+    parser.add_argument("--isMC"     , dest="isMC"     , help="dataset is MC"             , default=False, action="store_true")
+    parser.add_argument("--dataset"  , dest="dataset"  , help="Unique path to DAS dataset", type=str , default="/HcalNZS/*Run2024*/RAW*")
+    parser.add_argument("--tag"      , dest="tag"      , help="Unique tag name for output", type=str , default="NULL")
+    parser.add_argument("--runs"     , dest="runs"     , help="Run(s) to process"         , type=str , nargs="+", default=["1"])
+    parser.add_argument("--era"      , dest="era"      , help="Era to use"                , type=str , default="Run3")
+    parser.add_argument("--globalTag", dest="globalTag", help="Global tag to use"         , type=str , default="140X_dataRun3_Prompt_v4")
+    parser.add_argument("--l1TrgObjs", dest="l1TrgObjs", help="Override GT with L1TrgObj" , type=str , default="")
     args = parser.parse_args()
 
-    tag         = args.tag
-    runs        = args.runs
-    era         = args.era
-    globalTag   = args.globalTag
-    l1TrgObjs   = args.l1TrgObjs
-    dataset     = args.dataset
-    submit      = args.submit
-
-    overrideL1TrgObjs = ""
-    if l1TrgObjs != "":
-        overrideL1TrgObjs = f"Tag,HcalL1TriggerObjectsRcd,sqlite_file:{l1TrgObjs}"
-
-    chunks = dataset.split("/")
-    streamwild  = "*" in chunks[1]
-    configwild  = "*" in chunks[2]
-    tierwild    = "*" in chunks[3]
-
-    streamcards = chunks[1].split("*")
-    configcards = chunks[2].split("*")
-    tiercards   = chunks[3].split("*")
-
-    stream = chunks[1].replace("*", "")
-    config = chunks[2].replace("*", "")
-    tier   = chunks[3].replace("*", "")
+    tag       = args.tag
+    runs      = args.runs
+    era       = args.era
+    globalTag = args.globalTag
+    l1TrgObjs = args.l1TrgObjs
+    overwrite = args.overwrite
+    dataset   = args.dataset
+    submit    = args.submit
 
     # Get CMSSW environment
     CMSSW_BASE    = os.getenv("CMSSW_BASE")
     CMSSW_VERSION = os.getenv("CMSSW_VERSION")
 
-    # Get the list of input files to run over
-    isMC = False
-    inputFiles = []
+    overrideL1TrgObjs = ""
+    if l1TrgObjs != "":
+        overrideL1TrgObjs = f"Tag,HcalL1TriggerObjectsRcd,sqlite_file:{l1TrgObjs}"
+
+    # Simpler getting of files if providing EOS path
+    onEOS = "eos" in dataset
 
     # Check keywords in requested data set to determine if running on MC or data
-    if any(mcStr in dataset for mcStr in ["GEN", "SIM", "_mc"]):
+    isMC = False
+    if any(mcStr in dataset for mcStr in ["GEN", "SIM", "_mc"]) or args.isMC:
         isMC = True
 
-    for run in runs:
+    # Get the list of input files to run over
+    inputFiles = []
 
-        runStr = "run={run}"
-        if isMC:
-            runStr = ""
+    # Need to query das and find relevant dataset and list of files
+    if not onEOS:
+        chunks = dataset.split("/")
+        streamwild  = "*" in chunks[1]
+        configwild  = "*" in chunks[2]
+        tierwild    = "*" in chunks[3]
 
-        explicitDataset = dataset
-        if "*" in dataset:
-            proc = subprocess.run(f'dasgoclient --query="dataset {runStr}"', capture_output=True, shell=True) 
-            datasets = proc.stdout.decode('utf-8').split("\n")
-            for dset in datasets:
-                dsetchunks = dset.split("/")
-                dsetstream = dsetchunks[1]
-                dsetconfig = dsetchunks[2]
-                dsettier   = dsetchunks[3]
-                if ((streamwild and all(streamcard in dsetstream for streamcard in streamcards)) or (not streamwild and stream == dsetstream)) and \
-                   ((configwild and all(configcard in dsetconfig for configcard in configcards)) or (not configwild and config == dsetconfig)) and \
-                   ((tierwild   and all(tiercard   in dsettier   for tiercard   in tiercards))   or (not tierwild   and tier   == dsettier)):
-                    explicitDataset = dset
-                    break
-        
-        proc = subprocess.run(f'dasgoclient --query="file dataset={explicitDataset} {runStr}"', capture_output=True, shell=True)
-        files = proc.stdout.decode('utf-8').split("\n")
-        for file in files:
-            inputFiles.append(file.rstrip())
+        streamcards = chunks[1].split("*")
+        configcards = chunks[2].split("*")
+        tiercards   = chunks[3].split("*")
 
-        inputFiles = list(filter(None, inputFiles))
+        stream = chunks[1].replace("*", "")
+        config = chunks[2].replace("*", "")
+        tier   = chunks[3].replace("*", "")
+
+        for run in runs:
+
+            runStr = f"run={run}"
+            if isMC:
+                runStr = ""
+
+            explicitDataset = dataset
+            if "*" in dataset:
+                proc = subprocess.run(f'dasgoclient --query="dataset {runStr}"', capture_output=True, shell=True) 
+                datasets = proc.stdout.decode('utf-8').split("\n")
+                for dset in datasets:
+                    dsetchunks = dset.split("/")
+                    dsetstream = dsetchunks[1]
+                    dsetconfig = dsetchunks[2]
+                    dsettier   = dsetchunks[3]
+                    if ((streamwild and all(streamcard in dsetstream for streamcard in streamcards)) or (not streamwild and stream == dsetstream)) and \
+                       ((configwild and all(configcard in dsetconfig for configcard in configcards)) or (not configwild and config == dsetconfig)) and \
+                       ((tierwild   and all(tiercard   in dsettier   for tiercard   in tiercards))   or (not tierwild   and tier   == dsettier)):
+                        explicitDataset = dset
+                        break
+            
+            proc = subprocess.run(f'dasgoclient --query="file dataset={explicitDataset} {runStr}"', capture_output=True, shell=True)
+            files = proc.stdout.decode('utf-8').split("\n")
+            for file in files:
+                inputFiles.append(file.rstrip())
+
+            inputFiles = list(filter(None, inputFiles))
+    else:
+        inputFiles = glob.glob(dataset + "/*.root")
 
     taskDir = strftime("%Y%m%d_%H%M%S")
 
@@ -160,7 +173,7 @@ if __name__ == '__main__':
     workingDir = f"{hcalDir}/condor/{tag}_{taskDir}"
     
     # After defining the directory to work the job in and output to, make them
-    os.makedirs(outputDir.split(".ch//")[-1])
+    os.makedirs(outputDir.split(".ch//")[-1], exist_ok=overwrite)
     os.makedirs(workingDir)
 
     if l1TrgObjs != "":
@@ -206,10 +219,10 @@ if __name__ == '__main__':
     generate_job_steerer(workingDir, outputDir, l1TrgObjs, CMSSW_VERSION)
 
     # Write the condor submit file for condor to do its thing
-    generate_condor_submit(workingDir, inputFiles, l1TrgObjs, CMSSW_VERSION)    
+    generate_condor_submit(workingDir, inputFiles, l1TrgObjs, CMSSW_VERSION, USER, onEOS)    
 
     subprocess.call(["chmod", "+x", f"{workingDir}/run_analyze_tps.sh"])
 
-    subprocess.call(["tar", "--exclude-caches-all", "--exclude-vcs", "-zcf", f"{workingDir}/{CMSSW_VERSION}.tar.gz", "--exclude=tmp", "--exclude=bin", "--exclude=condor", "--exclude=histos", "--exclude=plots", "--exclude=inputs", "-C", f"{CMSSW_BASE}/..", CMSSW_VERSION])
+    subprocess.call(["tar", "--exclude-caches-all", "--exclude-vcs", "-zcf", f"{workingDir}/{CMSSW_VERSION}.tar.gz", "--exclude=tmp", "--exclude=bin", "--exclude=src/Debug", "-C", f"{CMSSW_BASE}/..", CMSSW_VERSION])
     
     if submit: os.system(f"condor_submit {workingDir}/condorSubmit.jdl")

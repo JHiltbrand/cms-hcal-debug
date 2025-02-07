@@ -39,7 +39,7 @@ class AnalyzeTPs : public edm::one::EDAnalyzer<> {
         virtual void analyze(const edm::Event&, const edm::EventSetup&);
 
         // Applicable constants for Phase I, Run3
-        static const unsigned int FGCOUNT    = 7;
+        static const unsigned int FGCOUNT    = 6;
         static const unsigned int TPSAMPLES  = 4;
         static const unsigned int MAXSAMPLES = 10;
         static const uint8_t      NIETARINGS = 16 /**HB**/ + 12 /**HE**/ + 12 /**HF**/;
@@ -49,6 +49,8 @@ class AnalyzeTPs : public edm::one::EDAnalyzer<> {
 
         // For TP ET bins, LSB is 0.5 GeV, so double ET range, and add one more bin for 0
         static const uint16_t     NTPETBINS = 2 * 128 + 1;
+
+        static const uint8_t TOTALSUBDETBINS = 3;
 
         edm::EDGetTokenT<HcalTrigPrimDigiCollection>      tok_packedDigis_;
         edm::EDGetTokenT<HcalTrigPrimDigiCollection>      tok_reemulDigis_;
@@ -90,7 +92,7 @@ AnalyzeTPs::AnalyzeTPs(const edm::ParameterSet& config) :
     tok_packedDigis_(consumes<HcalTrigPrimDigiCollection>(config.getParameter<edm::InputTag>("packedTriggerPrimitives"))),
     tok_reemulDigis_(consumes<HcalTrigPrimDigiCollection>(config.getParameter<edm::InputTag>("reemulTriggerPrimitives"))),
     tok_hcalCoder_(esConsumes<CaloTPGTranscoder, CaloTPGRecord>()),
-    tok_vtx_(consumes<reco::VertexCollection>(edm::InputTag("offlinePrimaryVertices", "", "RECO"))),
+    tok_vtx_(consumes<reco::VertexCollection>(config.getParameter<edm::InputTag>("offlinePrimaryVertices"))),
     tok_trig_(consumes<edm::TriggerResults>(edm::InputTag("TriggerResults", "", "HLT")))
 {
     edm::Service<TFileService> fs;
@@ -139,7 +141,6 @@ AnalyzeTPs::AnalyzeTPs(const edm::ParameterSet& config) :
     occ_->Branch("et_thresh",   &occ_et_thresh_, "et_thresh/f");
     occ_->Branch("occu_packed", &occ_packed_,    "occu_packed/b");
     occ_->Branch("occu_reemul", &occ_reemul_,    "occu_reemul/b");
-
 }
 
 AnalyzeTPs::~AnalyzeTPs() {}
@@ -184,6 +185,8 @@ void AnalyzeTPs::analyze(const edm::Event& event, const edm::EventSetup& setup) 
                ++occ_nVtx_;
             }
         }
+    } else {
+        LogWarning("AnalyzeTPs") << "Could not find the offlinePrimaryVertices collection - continuing without vtx info" << std::endl;
     }
 
     run_   = event.id().run();
@@ -214,6 +217,7 @@ void AnalyzeTPs::analyze(const edm::Event& event, const edm::EventSetup& setup) 
         packedMap[digi.id()] = digi;
     }
     std::vector<std::vector<uint8_t> > occupancy_map_packed(TOTALIETABINS, std::vector<uint8_t>(NTPETBINS, 0));
+    std::vector<std::vector<uint8_t> > occupancy_map_subdet_packed(TOTALSUBDETBINS, std::vector<uint8_t>(NTPETBINS, 0));
 
     digi_map reemulMap;
     for (const auto& digi : *reemulDigis) {
@@ -221,10 +225,14 @@ void AnalyzeTPs::analyze(const edm::Event& event, const edm::EventSetup& setup) 
         reemulMap[digi.id()] = digi;
     }
     std::vector<std::vector<uint8_t> > occupancy_map_reemul(TOTALIETABINS, std::vector<uint8_t>(NTPETBINS, 0));
+    std::vector<std::vector<uint8_t> > occupancy_map_subdet_reemul(TOTALSUBDETBINS, std::vector<uint8_t>(NTPETBINS, 0));
 
     // Begin loop over all TPs (IDs) (both packed and reemul) found in the event
     for (const auto& id : ids) {
         if (id.version() == 1 and abs(id.ieta()) >= 40 and id.iphi() % 4 == 1)
+            continue;
+
+        if (abs(id.ieta()) == 42)
             continue;
 
         tp_ieta_    = id.ieta();
@@ -232,7 +240,15 @@ void AnalyzeTPs::analyze(const edm::Event& event, const edm::EventSetup& setup) 
 
         // Ieta index for filling out TP occupancy vector of vectors
         // index 0 -> ieta -41, and index 82 -> ieta 41
-        uint8_t ietaIndex = tp_ieta_ + 41;
+        uint8_t ietaIndex = tp_ieta_ + NIETARINGS + 1;
+
+        uint8_t subdetIndex = 0;
+        if (abs(tp_ieta_) <= 16)
+            subdetIndex = 0;
+        else if (abs(tp_ieta_) > 16 and abs(tp_ieta_) <= 28)
+            subdetIndex = 1;
+        else if (abs(tp_ieta_) >= 30)
+            subdetIndex = 2;
 
         digi_map::const_iterator digi;
         if ((digi = packedMap.find(id)) != packedMap.end()) {
@@ -248,8 +264,11 @@ void AnalyzeTPs::analyze(const edm::Event& event, const edm::EventSetup& setup) 
             uint16_t etPackedIndex = tp_et_packed_ * 2.0;
             // TP ET here is used as a threshold, so a TP with particular ET
             // would occupy all ET bins up-to-and-including the specific ET
-            for (auto i = 0; i <= etPackedIndex; i++)
+            for (auto i = 0; i <= etPackedIndex; i++) {
+
                 occupancy_map_packed[ietaIndex][i] += 1;
+                occupancy_map_subdet_packed[subdetIndex][i] += 1;
+            }
             
         // Not clear when (if ever) we have a packed TP but no reemul TP...
         } else {
@@ -286,29 +305,41 @@ void AnalyzeTPs::analyze(const edm::Event& event, const edm::EventSetup& setup) 
             uint16_t etReemulIndex = tp_et_reemul_ * 2.0;
             // TP ET here is used as a threshold, so a TP with particular ET
             // would occupy all ET bins up-to-and-including the specific ET
-            for (std::size_t i = 0; i <= etReemulIndex; i++)
+            for (std::size_t i = 0; i <= etReemulIndex; i++) {
                 occupancy_map_reemul[ietaIndex][i] += 1;
+                occupancy_map_subdet_reemul[subdetIndex][i] += 1;
+            }
 
         // Again, not clear when (if ever) we have a reemul TP but no packed TP...
         } else {
             tp_found_reemul_ = 0;
         }
+
         tps_->Fill();
     }
 
     // Having gone over all TPs in the event, loop over the occupancy "map"
     // and fill the separate TTree
-    for (auto ietaIndex = 0; ietaIndex < TOTALIETABINS; ietaIndex++) {
-        for (auto etIndex = 0; etIndex < NTPETBINS; etIndex++) {
-            occ_ieta_      = ietaIndex - NIETARINGS;
+    for (auto etIndex = 0; etIndex < NTPETBINS; etIndex++) {
+        occ_et_thresh_ = float(etIndex) / 2.0;
+
+        for (auto ietaIndex = 0; ietaIndex < TOTALIETABINS; ietaIndex++) {
+            occ_ieta_      = ietaIndex - (NIETARINGS + 1);
 
             // Skip unphysical tower ietas
             if (occ_ieta_ == 0 or abs(occ_ieta_) == 29)
                 continue;
 
-            occ_et_thresh_ = float(etIndex) / 2.0;
-            occ_packed_    = occupancy_map_packed[ietaIndex][etIndex];
-            occ_reemul_    = occupancy_map_reemul[ietaIndex][etIndex];
+            occ_packed_ = occupancy_map_packed[ietaIndex][etIndex];
+            occ_reemul_ = occupancy_map_reemul[ietaIndex][etIndex];
+
+            occ_->Fill();
+        }
+
+        for (auto subdetIndex = 0; subdetIndex < TOTALSUBDETBINS; subdetIndex++) {
+            occ_ieta_   = NIETARINGS + subdetIndex + 2;
+            occ_packed_ = occupancy_map_subdet_packed[subdetIndex][etIndex];
+            occ_reemul_ = occupancy_map_subdet_reemul[subdetIndex][etIndex];
             occ_->Fill();
         }
     }
