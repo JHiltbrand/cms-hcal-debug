@@ -7,6 +7,7 @@ import random
 import argparse
 import datetime
 import subprocess
+from pathlib import Path
 import multiprocessing as mp
 
 import ROOT
@@ -19,7 +20,10 @@ ROOT.TH3.SetDefaultSumw2()
 # Routine that is called for each individual histogram that is to be 
 # drawn from the input tree. All information about what to draw, selections,
 # and weights is contained in the histOps dictionary
-def makeNDhisto(year, proc, inputIndex, histOps, outfile, tree):
+def makeNDhisto(year, inputIndex, histOps, outfile, file):
+
+    treeName = histOps["tree"]
+    tree = file.Get(treeName)
 
     # To efficiently TTree->Draw(), we will only "activate"
     # necessary branches. So first, disable all branches
@@ -128,31 +132,30 @@ def makeNDhisto(year, proc, inputIndex, histOps, outfile, tree):
 
 # Main function that a given pool process runs, the input TTree is opened
 # and the list of requested histograms are drawn to the output ROOT file
-def processFile(tempDir, inputFile, inputIndex, year, proc, histograms, treeName):
+def processFile(tempDir, inputFile, inputIndex, year, histograms):
 
     os.makedirs(tempDir, exist_ok=True)
 
     file = ROOT.TFile.Open(inputFile, "READONLY")
-    tree = file.Get(treeName)
 
     datetimeStr = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    outfile = ROOT.TFile.Open(f"{tempDir}/{proc}_{datetimeStr}_{inputIndex}.root", "RECREATE")
+    outfile = ROOT.TFile.Open(f"{tempDir}/{datetimeStr}_{inputIndex}.root", "RECREATE")
     outfile.cd()
 
     for histDict in histograms:
-        makeNDhisto(year, proc, inputIndex, histDict, outfile, tree)
+        makeNDhisto(year, inputIndex, histDict, outfile, file)
 
     outfile.Close()
 
 if __name__ == "__main__":
     usage = "%ttreeDrawer [options]"
     parser = argparse.ArgumentParser(usage)
-    parser.add_argument("--inputDir",  dest="inputDir",  help="Path to ntuples",      required=True            )
-    parser.add_argument("--outputDir", dest="outputDir", help="path for output ROOT", required=True            )
-    parser.add_argument("--tree",      dest="tree",      help="TTree name to draw",   default="analyzeTPs/tps"    )
-    parser.add_argument("--year",      dest="year",      help="which year",           default="2024"           )
-    parser.add_argument("--options",   dest="options",   help="histo options file",   default="ttreeDrawer_aux")
+    parser.add_argument("--inputDir",   dest="inputDir",   help="Path to ntuples",      required=True            )
+    parser.add_argument("--outputFile", dest="outputFile", help="path for output file", required=True            )
+    parser.add_argument("--tree",       dest="tree",       help="TTree name to draw",   default="analyzeTPs/tps" )
+    parser.add_argument("--year",       dest="year",       help="which year",           default="2024"           )
+    parser.add_argument("--options",    dest="options",    help="histo options file",   default="ttreeDrawer_aux")
     args = parser.parse_args()
     
     # The auxiliary file contains many "hardcoded" items
@@ -164,10 +167,9 @@ if __name__ == "__main__":
     # Names of histograms, rebinning
     histograms = importedGoods.histograms
     
-    inputDir  = args.inputDir
-    outputDir = args.outputDir
-    treeName  = args.tree
-    year      = args.year
+    inputDir   = args.inputDir
+    outputFile = args.outputFile
+    year       = args.year
     
     base = os.getenv("CMSSW_BASE")
     user = os.getenv("USER")
@@ -175,8 +177,6 @@ if __name__ == "__main__":
     datetimeStr = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     tempDir = f"/tmp/{user}/{datetimeStr}"
     
-    process = list(filter(None, inputDir.split("/")))[-1]
-
     inputFiles = glob.glob(inputDir + "/*.root")
 
     # For speed, histogramming for each input ROOT file
@@ -188,12 +188,15 @@ if __name__ == "__main__":
     results = []
     for inputFile in inputFiles:
         inputIndex = inputFiles.index(inputFile)
-        result = pool.apply_async(processFile, args=(tempDir, inputFile, inputIndex, year, process, histograms, treeName))
+        result = pool.apply_async(processFile, args=(tempDir, inputFile, inputIndex, year, histograms))
         results.append(result)
 
     for result in results:
         result.wait()
 
-    filesToHaddStr = " ".join(glob.glob(f"{tempDir}/{process}_*.root"))
-    subprocess.call(f"hadd -j 4 -f {outputDir}/{process}.root {filesToHaddStr}".split(" "))
+    pathToOutput = Path(outputFile).parent
+    os.makedirs(pathToOutput, exist_ok=True)
+
+    filesToHaddStr = " ".join(glob.glob(f"{tempDir}/*.root"))
+    subprocess.call(f"hadd -j 4 -f {outputFile} {filesToHaddStr}".split(" "))
     subprocess.call(f"rm -rf {tempDir}".split(" "))

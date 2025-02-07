@@ -157,19 +157,19 @@ class Histogram:
             if "X" in self.info:
                 if "rebin" in self.info["X"]:
                     self.histogram.RebinX(self.info["X"]["rebin"])
-                if "min" in self.info["X"]:
+                if "min" in self.info["X"] and "max" in self.info["X"]:
                     self.histogram.GetXaxis().SetRangeUser(self.info["X"]["min"], self.info["X"]["max"])
 
             if "Y" in self.info:
                 if "rebin" in self.info["Y"]:
                     self.histogram.RebinY(self.info["Y"]["rebin"])
-                if "min" in self.info["Y"]:
+                if "min" in self.info["Y"] and "max" in self.info["Y"]:
                     self.histogram.GetYaxis().SetRangeUser(self.info["Y"]["min"], self.info["Y"]["max"])
 
             if "Z" in self.info:
                 if "rebin" in self.info["Z"]:
                     self.histogram.RebinZ(self.info["Z"]["rebin"])
-                if "min" in self.info["Z"]:
+                if "min" in self.info["Z"] and "max" in self.info["Z"]:
                     self.histogram.GetZaxis().SetRangeUser(self.info["Z"]["min"], self.info["Z"]["max"])
 
             self.histogram.SetTitle("")
@@ -203,7 +203,8 @@ class Plotter:
         # to work with or without a ratio plot
         self.TopMargin    = 0.06
         self.BottomMargin = 0.12
-        self.RightMargin  = 0.12
+        self.RightMargin  = 0.04
+        #self.RightMargin  = 0.12
         self.LeftMargin   = 0.15
 
 
@@ -268,7 +269,7 @@ class Plotter:
         textSize = 0.028 / self.upperSplit
         space    = 0.015
 
-        xMin = 0.55
+        xMin = 0.35
         yMax = 1.0 - (self.TopMargin/self.upperSplit) - 0.02
         xMax = 1.0 - self.RightMargin - 0.02
         yMin = yMax - nLegendItems * (textSize + space)
@@ -299,20 +300,20 @@ class Plotter:
         mark = ROOT.TLatex()
         mark.SetNDC(True)
 
-        mark.SetTextAlign(11)
+        mark.SetTextAlign(13)
         mark.SetTextSize(0.055)
         mark.SetTextFont(61)
-        mark.DrawLatex(self.LeftMargin, 1 - (self.TopMargin - 0.015), "CMS")
+        mark.DrawLatex(self.LeftMargin + 0.040, 1 - (self.TopMargin + 0.01), "CMS")
 
         mark.SetTextFont(52)
         mark.SetTextSize(0.040)
 
         if   "supp" in self.official:
-            mark.DrawLatex(self.LeftMargin + 0.12, 1 - (self.TopMargin - 0.017), "Supplementary")
+            mark.DrawLatex(self.LeftMargin + 0.040, 1 - (self.TopMargin + 0.06), "Supplementary")
         elif "wip" in self.official:
-            mark.DrawLatex(self.LeftMargin + 0.12, 1 - (self.TopMargin - 0.017), "Work in Progress")
+            mark.DrawLatex(self.LeftMargin + 0.040, 1 - (self.TopMargin + 0.06), "Work in Progress")
         elif "int"  in self.official:
-            mark.DrawLatex(self.LeftMargin + 0.12, 1 - (self.TopMargin - 0.017), "internal")
+            mark.DrawLatex(self.LeftMargin + 0.040, 1 - (self.TopMargin + 0.06), "internal")
 
         mark.SetTextFont(42)
         mark.SetTextAlign(31)
@@ -364,6 +365,8 @@ class Plotter:
                         Hobj.Draw(canvas)
                         self.addCMSlogo(canvas)
                         saveName = f"{self.outpath}/{categoryName}_{histoName}"
+                        if self.normalize:
+                            saveName += "_norm"
                         canvas.SaveAs(f"{saveName}.pdf")
 
             elif histoInfo["dim"] == 1:
@@ -409,14 +412,13 @@ class Plotter:
                                 histosToRatio[drawInfo["ratio"]] = Hobj
                         dummy = Hobj.Clone("dummy%s"%(histoName))
                         dummy.Reset("ICESM")
+                        dummy.SetLineWidth(0)
+                        dummy.SetMarkerStyle(8)
+                        dummy.SetMarkerSize(0)
     
-                        newMax = Hobj.histogram.GetMaximum()
-                        if newMax > theMax:
-                            theMax = newMax
-
                     nLegendEntries += 1
 
-                legend, yMax = self.makeLegend(len(self.categories), histoInfo["logY"], theMin, theMax)
+                legend, yMax = self.makeLegend(len(self.categories), theMin, theMax, histoInfo["logY"])
 
                 if "max" not in histoInfo["Y"]:
                     dummy.SetMaximum(yMax)
@@ -425,7 +427,7 @@ class Plotter:
                 dummy.SetMinimum(theMin)
                 dummy.Draw()
 
-                drewAlready = False
+                drewAlready = True 
                 if aStack.GetNhists() > 0:
                     aStack.Draw("HIST")
                     drewAlready = True
@@ -442,24 +444,37 @@ class Plotter:
                 if self.doRatio:
 
                     ratio = histosToRatio["num"].Clone(f"{histosToRatio['num'].histogram.GetName()}_ratio")
-                    ratio.Reset()
-                    ratio.Add(histosToRatio["num"].histogram, histosToRatio["den"].histogram, 1.0, -1.0)
+                    #ratio.Reset()
+                    #ratio.Add(histosToRatio["num"].histogram, histosToRatio["den"].histogram, 1.0, -1.0)
                     ratio.Divide(histosToRatio["den"].histogram)
                     rDrawInfo = {"color" : ROOT.kBlack,  "lstyle" : 1, "mstyle" : 8, "lsize" : 3, "msize" : 1 / self.upperSplit}
                     rHistoInfo = copy.deepcopy(histoInfo)
                     rHistoInfo["Y"]["title"] = histoInfo["Y"]["rtitle"]
 
+                    line = ROOT.TLine(ratio.GetXaxis().GetXmin(), 1.0, ratio.GetXaxis().GetXmax(), 1.0)
+                    line.SetLineColor(ROOT.kBlue+3)
+                    line.SetLineWidth(2)
+                    line.SetLineStyle(2)
+
                     canvas.cd(2)
+                    ROOT.gPad.SetLogy()
                     ROOT.gPad.SetGridy()
                     ratio = Histogram(histo=ratio, scale=self.upperSplit/self.scale, lowerSplit=self.lowerSplit/self.scale, histoInfo=rHistoInfo, drawInfo=rDrawInfo).histogram
 
-                    ratio.SetMinimum(-0.24)
-                    ratio.SetMaximum(0.24)
+                    if "rmin" in histoInfo["Y"]:
+                        ratio.SetMinimum(histoInfo["Y"]["rmin"])
+                    if "rmax" in histoInfo["Y"]:
+                        ratio.SetMaximum(histoInfo["Y"]["rmax"])
                     ratio.GetYaxis().SetNdivisions(5, 5, 0)
 
                     ratio.Draw("E0P")
+                    line.Draw("SAME")
+                    ratio.Draw("E0P SAME")
 
-                canvas.Print("%s/%s.pdf"%(self.outpath, histoName))
+                saveName = f"{self.outpath}/{histoName}"
+                if self.normalize:
+                    saveName += "_norm"
+                canvas.Print(f"{saveName}.pdf")
 
 
 if __name__ == "__main__":
