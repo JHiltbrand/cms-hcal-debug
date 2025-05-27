@@ -1,13 +1,13 @@
 # Setup Working Environment
 
-    cmsrel CMSSW_14_2_1
+    cmsrel CMSSW_15_0_6_patch1
     cd $CMSSW_BASE/src
     cmsenv
 
     git cms-addpkg DataFormats/HcalDigi
     git cms-addpkg SimCalorimetry/HcalTrigPrimAlgos
 
-    git cms-merge-topic --unsafe JHiltbrand:tpAuxInfo_142X
+    git cms-merge-topic --unsafe JHiltbrand:tpAuxInfo_150X
 
     git cms-checkdeps -a -A
 
