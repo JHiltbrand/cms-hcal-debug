@@ -11,7 +11,7 @@
 
     git cms-checkdeps -a -A
 
-    git clone git@github.com:jhiltbra/cms-hcal-debug.git Debug/HcalDebug
+    git clone git@github.com:JHiltbrand/cms-hcal-debug.git Debug/HcalDebug
 
     scram b clean
     scram b -j 8
